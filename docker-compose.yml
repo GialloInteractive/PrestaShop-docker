@@ -1,25 +1,53 @@
-version: '3.8'
+networks:
+  prestashop-network:
+    driver: bridge
 
 services:
-  # PrestaShop service running the official Docker image
-  prestashop:
-    image: prestashop/prestashop:8.2.0  # or use tag "8" if 8.2.0 is not available
-    ports:
-      - "80:80"   # Railway will map container port 80 to a public URL
-    environment:
-      DB_SERVER: db
-      DB_NAME: prestashop
-      DB_USER: root
-      DB_PASSWD: admin
-      PS_INSTALL_AUTO: 0  # Set to 0 so you can run the installer manually
-      # You may also set PS_DOMAIN to the Railway-provided URL later if needed
-    depends_on:
-      - db
+  generate:
+    image: ubuntu:latest
+    volumes:
+      - .:/prestashop-docker
+    command: ["/prestashop-docker/.docker/generate-docker.sh"]
+    networks:
+      - prestashop-network
 
-  # MySQL service required by PrestaShop
-  db:
+  mysql:
     image: mysql:5.7
-    command: --default-authentication-plugin=mysql_native_password
+    platform: "linux/amd64"
+    container_name: mysql-1
+    networks:
+      - prestashop-network
     environment:
       MYSQL_ROOT_PASSWORD: admin
-      MYSQL_DATABASE: prestashop
+    ports:
+      - "3307:3306"
+
+  prestashop:
+    image: prestashop/prestashop:8.2.0
+    platform: "linux/amd64"
+    container_name: prestashop-app
+    networks:
+      - prestashop-network
+    environment:
+      - DB_SERVER=mysql-1
+      - PS_DEV_MODE=1  # Enable developer mode
+    ports:
+      - "3001:80"
+    expose:
+      - "80"
+    volumes:
+      - ./prestashop:/var/www/html  # Map PrestaShop files to the host
+      - ./modules:/var/www/html/modules  # Optional: Specific modules folder
+      - ./themes:/var/www/html/themes    # Optional: Specific themes folder
+      - ./override:/var/www/html/override # Optional: Override files
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: phpmyadmin-1
+    networks:
+      - prestashop-network
+    environment:
+      PMA_HOST: mysql-1
+      MYSQL_ROOT_PASSWORD: admin
+    ports:
+      - "3000:80"
