@@ -1,6 +1,35 @@
+version: '3.8'
+
 services:
+  # This service runs the generate script to create/update configuration files
   generate:
     image: ubuntu:latest
     volumes:
       - .:/prestashop-docker
     command: ["/prestashop-docker/.docker/generate-docker.sh"]
+    # Optionally pass PS_VERSION if needed:
+    # environment:
+    #   - PS_VERSION=8.2.0
+
+  # PrestaShop service running the official Docker image
+  prestashop:
+    image: prestashop/prestashop:8.2.0  # or use tag "8" if 8.2.0 is not available
+    ports:
+      - "80:80"   # Railway will map container port 80 to a public URL
+    environment:
+      DB_SERVER: db
+      DB_NAME: prestashop
+      DB_USER: root
+      DB_PASSWD: admin
+      PS_INSTALL_AUTO: 0  # Set to 0 so you can run the installer manually
+      # You may also set PS_DOMAIN to the Railway-provided URL later if needed
+    depends_on:
+      - db
+
+  # MySQL service required by PrestaShop
+  db:
+    image: mysql:5.7
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_DATABASE: prestashop
